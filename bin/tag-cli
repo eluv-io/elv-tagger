@@ -22,13 +22,11 @@ Available commands:
     finalize    Finalize the content object with tag files/links uploaded
 
 Flags:
-    library     Library id of the content object
-    qid         Object id of the content object
-    tqw         Write token for editing the content
+    library id          Library id of the content object
+    object id           Object id of the content object
+    write token         Write token for editing the content
     --config            Client configuration for fabric networks
     --lro_handle        LRO handle returned by the tagging process
-    -l, --library_id    Fabric library id for the content in the fabric
-    -q, --object_id     Fabric object id for the content object
     -c, --container_id  Container index to run the tagger, [0, 1, 2]
     -s, --start_time    Start time of the video to run the tagger
     -e, --end_time      End time of the video to run the tagger
