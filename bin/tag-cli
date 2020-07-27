@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+
+set -e
+
+usage () {
+cat <<HELP_USAGE
+Usage: tag-cli [command] [flags]
+
+Examples
+    tag-cli tag ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c=0 -s=20 -e=39 -i=10 -f="od" --config=config.json
+
+    tag-cli stop ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c=0 --config=config.json
+
+    tag-cli status ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c=0 --config=config.json --lro_handle="662291b5-c093-4302-9962-1207fb238299"
+
+    tag-cli finalize ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV tqw_8uHxaEot6ESoyuHxsFMvdhagHUByBwqrY --config=config.json
+
+Available commands:
+    tag         Invoke a tagging process
+    status      Check the status of a tagging process
+    stop        Stop a tagging process
+    finalize    Finalize the content object with tag files/links uploaded
+
+Flags:
+    library     Library id of the content object
+    qid         Object id of the content object
+    tqw         Write token for editing the content
+    --config            Client configuration for fabric networks
+    --lro_handle        LRO handle returned by the tagging process
+    -l, --library_id    Fabric library id for the content in the fabric
+    -q, --object_id     Fabric object id for the content object
+    -c, --container_id  Container index to run the tagger, [0, 1, 2]
+    -s, --start_time    Start time of the video to run the tagger
+    -e, --end_time      End time of the video to run the tagger
+    -i, --interval      Time interval, multiple of which one tagging process aims for
+    -f, --features      Machine learning features to tag, options ["celeb", "ocr", "od", "landmark", "action", "segment", "logo"]
+HELP_USAGE
+    exit
+}
+
+for ARGUMENT in "$@"
+do
+    if [[ $ARGUMENT == "-h" ]] || [[ $ARGUMENT == "--help" ]]; then
+        usage
+    fi
+
+    KEY=$(echo $ARGUMENT | cut -f1 -d=)
+    VALUE=$(echo $ARGUMENT | cut -f2 -d=)
+    case "$KEY" in
+            ilib*)              LID=${KEY} ;;
+            iq__*)              QID=${KEY} ;;
+            tqw*)               TQW=${KEY} ;;
+            -c|--container_id)  CONTAINER=${VALUE} ;;
+            -s|--start_time)    START=${VALUE} ;;
+            -e|--end_time)      END=${VALUE} ;;
+            -i|--interval)      INT=${VALUE} ;;
+            -f|--features)      FEATURES=${VALUE} ;;
+            --config)           CONFIG=${VALUE} ;;
+            --lro_handle)       LRO_HANDLE=${VALUE} ;;
+            *)
+    esac
+
+    for f in "tag" "status" "stop" "finalize"
+    do
+        if [[ $ARGUMENT == $f ]]; then
+            FLAG=$ARGUMENT
+            break
+        fi
+    done
+done
+
+if [[ $(echo $(which elv)) != "" ]]; then
+    CLI=$(which elv)
+elif [[ $(echo $(which qfab_cli)) != "" ]]; then
+    CLI=$(which qfab_cli)
+else
+    echo "Error: qfab_cli or elv not found, please check"
+    exit
+fi
+
+if [[ $(echo $(which curl)) == "" ]] || [[ $(echo $(which jq)) == "" ]]; then
+    echo "Error: curl or jq is not installed, please check"
+    exit
+fi
+CURL=$(which curl)
+
+if [[ $FLAG != "finalize" ]]
+then
+    AUTH_TOKEN=$($CLI content token create $LID $QID --config $CONFIG | jq .bearer)
+    AUTH_TOKEN=$(sed -e 's/^"//' -e 's/"$//' <<< "$AUTH_TOKEN")
+fi
+
+if [[ $FLAG == "tag" ]]
+then
+    TQW=$($CLI content edit $LID $QID --config $CONFIG | jq .q.write_token)
+    TQW=$(sed -e 's/^"//' -e 's/"$//' <<< "$TQW")
+    LRO_HANDLE=$($CURL -s -d "{\"start_time\": $START, \"end_time\" : $END, \"interval\" : $INT, \"features\": \"$FEATURES\"}" -H "Content-Type: application/json" -X POST "http://192.168.90.214/qlibs/$LID/q/$TQW/call/tag?container_id=$CONTAINER&authorization=$AUTH_TOKEN" | jq .lro_handle)
+    echo "{'write_token': $TQW, 'lro_handle': $LRO_HANDLE}"
+fi
+
+if [[ $FLAG == "status" ]]
+then
+    echo $($CURL -s -d "{\"lro_handle\":\"$LRO_HANDLE\"}" -H "Content-Type: application/json" -X POST "http://192.168.90.214/qlibs/$LID/q/$QID/call/tag_status?container_id=$CONTAINER&authorization=$AUTH_TOKEN")
+fi
+
+if [[ $FLAG == "stop" ]]
+then
+    $CURL -H "Content-Type: application/json" -X POST "http://192.168.90.214/qlibs/$LID/q/$QID/call/tag_stop?container_id=$CONTAINER&authorization=$AUTH_TOKEN"
+fi
+
+if [[ $FLAG == "finalize" ]]
+then
+    $CLI content finalize $LID $TQW --qid $QID --config  $CONFIG
+fi
