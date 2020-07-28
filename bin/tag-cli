@@ -67,6 +67,8 @@ do
     done
 done
 
+BASE_URL=$(sed -e 's/^"//' -e 's/"$//' <<< $(cat $CONFIG | jq .api.url))
+
 if [[ $(echo $(which elv)) != "" ]]; then
     CLI=$(which elv)
 elif [[ $(echo $(which qfab_cli)) != "" ]]; then
@@ -92,18 +94,19 @@ if [[ $FLAG == "tag" ]]
 then
     TQW=$($CLI content edit $LID $QID --config $CONFIG | jq .q.write_token)
     TQW=$(sed -e 's/^"//' -e 's/"$//' <<< "$TQW")
-    LRO_HANDLE=$($CURL -s -d "{\"start_time\": $START, \"end_time\" : $END, \"interval\" : $INT, \"features\": \"$FEATURES\"}" -H "Content-Type: application/json" -X POST "http://192.168.90.214/qlibs/$LID/q/$TQW/call/tag?container_id=$CONTAINER&authorization=$AUTH_TOKEN" | jq .lro_handle)
+    echo $LID $QID $CONFIG $AUTH_TOKEN $TQW
+    LRO_HANDLE=$($CURL -s -d "{\"start_time\": $START, \"end_time\" : $END, \"interval\" : $INT, \"features\": \"$FEATURES\"}" -H "Content-Type: application/json" -X POST "$BASE_URL/qlibs/$LID/q/$TQW/call/tag?container_id=$CONTAINER&authorization=$AUTH_TOKEN" | jq .lro_handle)
     echo "{'write_token': $TQW, 'lro_handle': $LRO_HANDLE}"
 fi
 
 if [[ $FLAG == "status" ]]
 then
-    echo $($CURL -s -d "{\"lro_handle\":\"$LRO_HANDLE\"}" -H "Content-Type: application/json" -X POST "http://192.168.90.214/qlibs/$LID/q/$QID/call/tag_status?container_id=$CONTAINER&authorization=$AUTH_TOKEN")
+    echo $($CURL -s -d "{\"lro_handle\":\"$LRO_HANDLE\"}" -H "Content-Type: application/json" -X POST "$BASE_URL/qlibs/$LID/q/$QID/call/tag_status?container_id=$CONTAINER&authorization=$AUTH_TOKEN")
 fi
 
 if [[ $FLAG == "stop" ]]
 then
-    $CURL -H "Content-Type: application/json" -X POST "http://192.168.90.214/qlibs/$LID/q/$QID/call/tag_stop?container_id=$CONTAINER&authorization=$AUTH_TOKEN"
+    $CURL -H "Content-Type: application/json" -X POST "$BASE_URL/qlibs/$LID/q/$QID/call/tag_stop?container_id=$CONTAINER&authorization=$AUTH_TOKEN"
 fi
 
 if [[ $FLAG == "finalize" ]]
