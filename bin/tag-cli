@@ -38,9 +38,9 @@ Available commands:
     stop                  Stop a tagging process
     finalize              Finalize the content object with tag files/links uploaded
 Flags:
-    library-id            Library id of the content object (form of ilib*)
-    object-id             Object id of the content object (form of iq__*)
-    write-token           Write token for editing the content (form of tqw_*)
+    library_id            Library id of the content object (form of ilib*)
+    object_id             Object id of the content object (form of iq__*)
+    write_token           Write token for editing the content (form of tqw_*)
     --config              Client configuration for fabric networks
     --lro_handle          LRO handle returned by the tagging process
     -c, --container_id    Container index to run the tagger, [0, 1, 2]
