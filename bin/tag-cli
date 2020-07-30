@@ -1,115 +1,235 @@
-#!/usr/bin/env bash
+#!/bin/bash -e
 
-set -e
+ELV_CMDS_AVAIL=0
+CLI=elv
 
-usage () {
-cat <<HELP_USAGE
-Usage: tag-cli [command] [flags]
-
-Examples
-    tag-cli tag ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c=0 -s=20 -e=39 -i=10 -f="od" --config=config.json
-
-    tag-cli stop ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c=0 --config=config.json
-
-    tag-cli status ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c=0 --config=config.json --lro_handle="662291b5-c093-4302-9962-1207fb238299"
-
-    tag-cli finalize ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV tqw_8uHxaEot6ESoyuHxsFMvdhagHUByBwqrY --config=config.json
-
-Available commands:
-    tag         Invoke a tagging process
-    status      Check the status of a tagging process
-    stop        Stop a tagging process
-    finalize    Finalize the content object with tag files/links uploaded
-
-Flags:
-    library id          Library id of the content object
-    object id           Object id of the content object
-    write token         Write token for editing the content
-    --config            Client configuration for fabric networks
-    --lro_handle        LRO handle returned by the tagging process
-    -c, --container_id  Container index to run the tagger, [0, 1, 2]
-    -s, --start_time    Start time of the video to run the tagger
-    -e, --end_time      End time of the video to run the tagger
-    -i, --interval      Time interval, multiple of which one tagging process aims for
-    -f, --features      Machine learning features to tag, options ["celeb", "ocr", "od", "landmark", "action", "segment", "logo"]
-HELP_USAGE
-    exit
+# Check if used applications/tools are present
+hash jq 2> /dev/null || {
+    echo "Error: jq not on this host.  Please install"
+    exit 1
 }
 
-for ARGUMENT in "$@"
-do
-    if [[ $ARGUMENT == "-h" ]] || [[ $ARGUMENT == "--help" ]]; then
+hash curl 2> /dev/null || {
+    echo "Error: curl not on this host.  Please install"
+    exit 1
+}
+
+hash elv 2> /dev/null || {
+    ELV_CMDS_AVAIL=$((ELV_CMDS_AVAIL++))
+    CLI=qfab_cli
+}
+
+hash qfab_cli 2> /dev/null || {
+    ELV_CMDS_AVAIL=$((ELV_CMDS_AVAIL++))
+}
+
+if [[ ${ELV_CMDS_AVAIL} -gt 0 ]]; then
+    echo "Error: qfab_cli or elv not found, please check"
+    exit 1
+fi
+
+# Usage function
+function usage () {
+cat <<HELP_USAGE
+Usage: ${0} [command] [flags]
+Available commands:
+    tag                   Invoke a tagging process
+    status                Check the status of a tagging process
+    stop                  Stop a tagging process
+    finalize              Finalize the content object with tag files/links uploaded
+Flags:
+    library-id            Library id of the content object (form of ilib*)
+    object-id             Object id of the content object (form of iq__*)
+    write-token           Write token for editing the content (form of tqw_*)
+    --config              Client configuration for fabric networks
+    --lro_handle          LRO handle returned by the tagging process
+    -c, --container_id    Container index to run the tagger, [0, 1, 2]
+    -s, --start_time      Start time of the video to run the tagger
+    -e, --end_time        End time of the video to run the tagger
+    -i, --interval        Time interval, multiple of which one tagging process aims for
+    -f, --features        Machine learning features to tag, options ["celeb", "ocr", "od", "landmark", "action", "segment", "logo"]
+Examples:
+    ${0} tag ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c 0 -s 20 -e 39 -i 10 -f "od" --config config.json
+    ${0} stop ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c 0 --config config.json
+    ${0} status ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c 0 --config config.json --lro_handle "662291b5-c093-4302-9962-1207fb238299"
+    ${0} finalize ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV tqw_8uHxaEot6ESoyuHxsFMvdhagHUByBwqrY --config config.json
+HELP_USAGE
+    exit 1
+}
+
+# CLI args (other than help/h)
+LONG_ARGUMENT_LIST=(
+    "container_id"
+    "start_time"
+    "end_time"
+    "interval"
+    "features"
+    "config"
+    "lro_handle"
+)
+SHORT_ARGUMENT_LIST=("c" "s" "e" "i" "f")
+
+# Check platform being run on and set appropriate getopt location
+UNAME_OUT="$(uname -s)"
+case "${UNAME_OUT}" in
+    Linux*)
+        GETOPT=getopt
+        ;;
+    Darwin*)
+        brew list | grep gnu-getopt > /dev/null 2>&1 || {
+            echo "Error: running on mac, but brew or gnu-getopt are not installed"
+            exit 1
+        }
+        GETOPT=/usr/local/opt/gnu-getopt/bin/getopt
+        ;;
+    *)
+        echo "Error: not running on supported patform.  please run on Mac or Linux"
+        exit 1
+        ;;
+esac
+
+hash ${GETOPT} 2> /dev/null || {
+    echo "Error: GNU getopt not on system"
+    exit 1
+}
+
+# Read arguments
+opts=$(${GETOPT} \
+    --options "h$(printf "%s:" "${SHORT_ARGUMENT_LIST[@]}")" \
+    --longoptions "help,$(printf "%s:," "${LONG_ARGUMENT_LIST[@]}")" \
+    --name "$(basename "$0")" \
+    -- "$@"
+)
+
+# Evaluate CLI args
+eval set -- "${opts}"
+while true; do
+  case "$1" in
+    -h|--help)
         usage
-    fi
-
-    KEY=$(echo $ARGUMENT | cut -f1 -d=)
-    VALUE=$(echo $ARGUMENT | cut -f2 -d=)
-    case "$KEY" in
-            ilib*)              LID=${KEY} ;;
-            iq__*)              QID=${KEY} ;;
-            tqw*)               TQW=${KEY} ;;
-            -c|--container_id)  CONTAINER=${VALUE} ;;
-            -s|--start_time)    START=${VALUE} ;;
-            -e|--end_time)      END=${VALUE} ;;
-            -i|--interval)      INT=${VALUE} ;;
-            -f|--features)      FEATURES=${VALUE} ;;
-            --config)           CONFIG=${VALUE} ;;
-            --lro_handle)       LRO_HANDLE=${VALUE} ;;
-            *)
-    esac
-
-    for f in "tag" "status" "stop" "finalize"
-    do
-        if [[ $ARGUMENT == $f ]]; then
-            FLAG=$ARGUMENT
-            break
-        fi
-    done
+        shift # currently, won't be reached.  Added in case usage ever changed to not exit
+        ;;
+    -c|--container_id)
+        CONTAINER=$2
+        shift 2
+        ;;
+    -s|--start_time)
+        START=$2
+        shift 2
+        ;;
+    -e|--end_time)
+        END=$2
+        shift 2
+        ;;
+    -i|--interval)
+        INT=$2
+        shift 2
+        ;;
+    -f|--features)
+        FEATURES=$2
+        shift 2
+        ;;
+    --config)
+        CONFIG=$2
+        shift 2
+        ;;
+    --lro_handle)
+        LRO_HANDLE=$2
+        shift 2
+        ;;
+    -- )
+        shift
+        break
+        ;;
+    * ) break ;;
+  esac
 done
 
-BASE_URL=$(sed -e 's/^"//' -e 's/"$//' <<< $(cat $CONFIG | jq .api.url))
+for ARGUMENT in "$@"; do
+    case "${ARGUMENT}" in
+        ilib*)
+            LID=${ARGUMENT}
+            ;;
+        iq__*)
+            QID=${ARGUMENT}
+            ;;
+        tqw*)
+            TQW=${ARGUMENT}
+            ;;
+        tag|status|stop|finalize)
+            FLAG=${ARGUMENT}
+            ;;
+        *)
+            echo "Error: unknown argument passed: '${ARGUMENT}'"
+            exit 1
+            ;;
+    esac
+done
 
-if [[ $(echo $(which elv)) != "" ]]; then
-    CLI=$(which elv)
-elif [[ $(echo $(which qfab_cli)) != "" ]]; then
-    CLI=$(which qfab_cli)
-else
-    echo "Error: qfab_cli or elv not found, please check"
-    exit
+# Check if CONFIG set
+if [ -z ${CONFIG+x} ]; then
+    echo "Error: CONFIG is unset.  Please specify --config"
+    exit 1
 fi
 
-if [[ $(echo $(which curl)) == "" ]] || [[ $(echo $(which jq)) == "" ]]; then
-    echo "Error: curl or jq is not installed, please check"
-    exit
-fi
-CURL=$(which curl)
-
-if [[ $FLAG != "finalize" ]]
-then
-    AUTH_TOKEN=$($CLI content token create $LID $QID --config $CONFIG | jq .bearer)
-    AUTH_TOKEN=$(sed -e 's/^"//' -e 's/"$//' <<< "$AUTH_TOKEN")
+if [ ! -f ${CONFIG} ]; then
+    echo "Error: the file ${CONFIG} does not exist"
+    exit 1
 fi
 
-if [[ $FLAG == "tag" ]]
-then
-    TQW=$($CLI content edit $LID $QID --config $CONFIG | jq .q.write_token)
-    TQW=$(sed -e 's/^"//' -e 's/"$//' <<< "$TQW")
-    echo $LID $QID $CONFIG $AUTH_TOKEN $TQW
-    LRO_HANDLE=$($CURL -s -d "{\"start_time\": $START, \"end_time\" : $END, \"interval\" : $INT, \"features\": \"$FEATURES\"}" -H "Content-Type: application/json" -X POST "$BASE_URL/qlibs/$LID/q/$TQW/call/tag?container_id=$CONTAINER&authorization=$AUTH_TOKEN" | jq .lro_handle)
-    echo "{'write_token': $TQW, 'lro_handle': $LRO_HANDLE}"
+# Check if QID set
+if [ -z ${QID+x} ]; then
+    echo "Error: QID is unset.  Please specify iq__*"
+    exit 1
 fi
 
-if [[ $FLAG == "status" ]]
-then
-    echo $($CURL -s -d "{\"lro_handle\":\"$LRO_HANDLE\"}" -H "Content-Type: application/json" -X POST "$BASE_URL/qlibs/$LID/q/$QID/call/tag_status?container_id=$CONTAINER&authorization=$AUTH_TOKEN")
+# Check if LID set
+if [ -z ${LID+x} ]; then
+    echo "Error: LID is unset.  Please specify ilib*"
+    exit 1
 fi
 
-if [[ $FLAG == "stop" ]]
-then
-    $CURL -H "Content-Type: application/json" -X POST "$BASE_URL/qlibs/$LID/q/$QID/call/tag_stop?container_id=$CONTAINER&authorization=$AUTH_TOKEN"
+# Get API URL
+BASE_URL=$(jq -r .api.url ${CONFIG})
+
+# Get Token if needed
+if [[ ${FLAG} != "finalize" ]]; then
+    AUTH_TOKEN=$(${CLI} content token create ${LID} ${QID} --config ${CONFIG} | jq -r .bearer)
 fi
 
-if [[ $FLAG == "finalize" ]]
-then
-    $CLI content finalize $LID $TQW --qid $QID --config  $CONFIG
-fi
+case "${FLAG}" in
+    tag)
+        TQW=$(${CLI} content edit ${LID} ${QID} --config ${CONFIG} | jq -r .q.write_token)
+        LRO_HANDLE=$(curl \
+            -s \
+            -d "{\"start_time\": ${START}, \"end_time\" : ${END}, \"interval\" : ${INT}, \"features\": \"${FEATURES}\"}" \
+            -H "Content-Type: application/json" \
+            -X POST "${BASE_URL}/qlibs/${LID}/q/${TQW}/call/tag?container_id=${CONTAINER}&authorization=${AUTH_TOKEN}" \
+            | jq .lro_handle)
+        echo "{\"write_token\": \"${TQW}\", \"lro_handle\": ${LRO_HANDLE}}" | jq -c .
+        ;;
+    status)
+        echo $(curl \
+            -s \
+            -d "{\"lro_handle\":\"${LRO_HANDLE}\"}" \
+            -H "Content-Type: application/json" \
+            -X POST "${BASE_URL}/qlibs/${LID}/q/${QID}/call/tag_status?container_id=${CONTAINER}&authorization=${AUTH_TOKEN}")
+        ;;
+    stop)
+        curl \
+            -H "Content-Type: application/json" \
+            -X POST "${BASE_URL}/qlibs/${LID}/q/${QID}/call/tag_stop?container_id=${CONTAINER}&authorization=${AUTH_TOKEN}"
+        ;;
+    finalize)
+        # Check if TQW set
+        if [ -z ${TQW+x} ]; then
+            echo "Error: Cannot finalize -- TQW is unset.  Please specify tqw_*"
+            exit 1
+        fi
+        ${CLI} content finalize ${LID} ${TQW} --qid ${QID} --config  ${CONFIG}
+        ;;
+    *)
+        echo "Error: No action (tag, status, stop, finalize) provided"
+        exit 1
+        ;;
+esac
