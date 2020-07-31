@@ -19,7 +19,7 @@ The ML inference engine written in Python is hosted on Linux containers (LXC) an
 
 The native tagging service on the Fabric allows content viewers to do just-in-time clip queries based on the video metadata. It enables dynamic and personalized video/clip recommendation. The just-in-time programmatic capabilities of the Fabric together with the tagging service allow content providers to create customized clips, e.g. scene/topic/activity based clipping service leveraging content and audience metadata.
 
-The tagging service could also be used to offer programmatic automation of many manual media curation tasks, including automatic identification of credits via OCR, thumbnail or “poster” generation from key frames, identification of key brands/sub-franchise or activities for advertising insertion, and automatic identification of localization requirements (e.g. banned scenes). Here is a query example of "boxing" scenes extract from the Creed movie. Both the OCR and segment features have relevant clips, which one can future do clipping and advertising insertion.
+The tagging service could also be used to offer programmatic automation of many manual media curation tasks, including automatic identification of credits via OCR, thumbnail or “poster” generation from key frames, identification of key brands/sub-franchise or activities for advertising insertion, and automatic identification of localization requirements (e.g. banned scenes). Here is a query example of "boxing" scenes extract from the Creed movie. Both the OCR and segment features have relevant clips, which one can further do clipping and advertising insertion.
 
 ![](images/Creed.png)
 
