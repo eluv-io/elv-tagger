@@ -194,7 +194,7 @@ BASE_URL=$(jq -r .api.url ${CONFIG})
 
 # Get Token if needed
 if [[ ${FLAG} != "finalize" ]]; then
-    AUTH_TOKEN=$(${CLI} content token create ${LID} ${QID} --config ${CONFIG} | jq -r .bearer)
+    AUTH_TOKEN=$(${CLI} content token create ${LID} ${QID} --update --config ${CONFIG} | jq -r .bearer)
 fi
 
 case "${FLAG}" in
