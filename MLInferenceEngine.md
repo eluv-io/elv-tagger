@@ -1,8 +1,7 @@
 # Overview of the ML Inference Engine: Features and Fabric Integration
 
 
-At Eluvio, we have developed a multi-modality inference engine for universal video context understanding, including both frame-level and segment-level features, as shown in Fig. 1. Specifically, the frame features include celebrities, landmarks, objects, optical characters/texts, and brands/logos, where we tag key frames and aggregate them to a time-coded format, specifying the start and end time for all tags. As for the segment features, we explore both knowledge graph entities and action/activities for each 5/10-second segments, which enrich semantic concepts and topics. Each feature consists of a single- or multi-stage deep neural network model trained from the ground up on either open-sourced or customized large-scale video/audio datasets.
-
+At Eluvio, we have developed a multi-modality inference engine for universal video context understanding, including both frame-level and video-level features, as shown in Fig. 1. Specifically, the frame features include celebrities, landmarks, objects, optical characters/scene texts, and brands/logos, where we tag keyframes and aggregate them to a time-coded format, specifying the start and end time for all tags. As for the video features, we explore a variety of knowledge graph entities, action/activities, and audio recognition, to enrich semantic concepts and topics. We also developed shot/scene detection to enable downstream tasks like clip search, video clipping, etc. In the inference engine, each feature/model consists of a single- or multi-stage deep neural network model trained from the ground up on either open-sourced or customized large-scale video/audio datasets.
 ![](images/models.png)
 
 *Fig. 1.  Multi-modality inference engine for  universal video context understanding.*
