@@ -76,7 +76,7 @@ case "${UNAME_OUT}" in
         GETOPT=getopt
         ;;
     Darwin*)
-        brew list | grep gnu-getopt > /dev/null 2>&1 || {
+        brew list --formula | grep gnu-getopt > /dev/null 2>&1 || {
             echo "Error: running on mac, but brew or gnu-getopt are not installed"
             exit 1
         }
