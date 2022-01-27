@@ -40,6 +40,9 @@ brew install elv jq curl gnu-getopt
 * ```<object id>``` and ```<library id>```
 
 ## Usage of  the ```tag-cli```
+
+Tagger as a client API follows the same two-step workflow for content editing in the Fabric -- (1) editing the content with a write token (2) finalizing/publishing the content with updated changes, both, together with status-check and early stop are enabled in the `tag-cli`.
+
 ```
 Usage: ./bin/tag-cli [command] [flags]
 Available commands:
@@ -64,6 +67,7 @@ Examples:
     ./bin/tag-cli status ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV -c 0 --config config.json --lro_handle "662291b5-c093-4302-9962-1207fb238299"
     ./bin/tag-cli finalize ilibDeKuaKj1uzr5kq4mjWtsFzcihmQ iq__fanWxYmdrFfivQsViDoqrV9kgQV tqw_8uHxaEot6ESoyuHxsFMvdhagHUByBwqrY --config config.json
 ```
+Specifically, usage steps are
 
 * Invoke the tagging process with ```<config>```, ```<library id>```, and ```<object id>```. IDs can be extracted from the fabric browser. The ```tag``` command produces a ```<wrote_token>``` and a ```<lro_handle>```, which are required for the ```status``` check and content ```finalize```, respectively.
 
